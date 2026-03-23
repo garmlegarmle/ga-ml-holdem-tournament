@@ -1,7 +1,35 @@
 import { useEffect } from 'react';
 import { useGameStore } from '@/app/store/useGameStore';
+import { getPlayersAbleToAct } from '@/engine/core/seating';
 import { ACTION_PHASES } from '@/engine/stateMachine/phases';
 import { selectActingSeat } from '@/engine/stateMachine/selectors';
+import type { GameState } from '@/types/engine';
+
+function getAdvanceDelay(game: GameState, isAiAction: boolean): number {
+  if (isAiAction) {
+    return game.ui.actionSpeed;
+  }
+
+  const allInRunout = getPlayersAbleToAct(game.seats).length < 2;
+
+  switch (game.phase) {
+    case 'deal_hole_cards':
+      return 210;
+    case 'deal_flop':
+      return 440;
+    case 'deal_turn':
+    case 'deal_river':
+      return allInRunout ? 1120 : 920;
+    case 'showdown':
+      return 760;
+    case 'award_pots':
+      return 480;
+    case 'eliminate_players':
+      return 520;
+    default:
+      return 140;
+  }
+}
 
 export function useGameLoop() {
   const game = useGameStore((state) => state.game);
@@ -15,7 +43,7 @@ export function useGameLoop() {
 
     const actingSeat = selectActingSeat(game);
     const isAiAction = ACTION_PHASES.includes(game.phase) && Boolean(actingSeat && !actingSeat.isHuman);
-    const delay = isAiAction ? game.ui.actionSpeed : 90;
+    const delay = getAdvanceDelay(game, isAiAction);
     const timer = window.setTimeout(() => {
       advanceOneStep();
     }, delay);
